@@ -61,6 +61,8 @@ void RunSetMode(ref bool editMode, string screenInfo)
         return $"{label}  ({g.Count()} position{(g.Count() > 1 ? "er" : "")})";
     }).ToList();
 
+    options.Insert(0, "Återställ alla");
+
     Console.WriteLine("Sparade program för denna konfig:");
     int idx = MenuService.PickOption("Välj program (Ctrl+E = Edit-mode, Esc = Avsluta):", options, out var special);
 
@@ -75,7 +77,13 @@ void RunSetMode(ref bool editMode, string screenInfo)
 
     if (idx < 0) return;
 
-    var chosenGroup = programs[idx];
+    if (idx == 0)
+    {
+        RestoreAll(positions);
+        return;
+    }
+
+    var chosenGroup = programs[idx - 1];
     var savedForProcess = chosenGroup.ToList();
 
     SavedPosition chosen;
@@ -308,4 +316,33 @@ void RenameWindow(string screenInfo)
 
     StorageService.Save(data);
     MenuService.SetPendingMessage($"Döpte om \"{current.ProcessName}\" till \"{current.DisplayName}\".", MessageKind.Success);
+}
+
+void RestoreAll(List<SavedPosition> positions)
+{
+    int restored = 0;
+    int notFound = 0;
+
+    foreach (var group in positions.GroupBy(p => p.ProcessName))
+    {
+        var chosen = group.First();
+        var handles = WindowService.FindAllWindowsByProcessName(chosen.ProcessName);
+
+        if (handles.Count == 0)
+        {
+            notFound++;
+            continue;
+        }
+
+        foreach (var handle in handles)
+            WindowService.SetPosition(handle, chosen.X, chosen.Y, chosen.Width, chosen.Height);
+
+        restored++;
+    }
+
+    var msg = $"Återställde {restored} program.";
+    if (notFound > 0)
+        msg += $" {notFound} program hittades inte.";
+
+    MenuService.SetPendingMessage(msg, notFound > 0 ? MessageKind.Warning : MessageKind.Success);
 }
