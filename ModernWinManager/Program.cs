@@ -1,5 +1,17 @@
+using System.Reflection;
 using ModernWinManager.Models;
 using ModernWinManager.Services;
+
+var version = Assembly.GetExecutingAssembly()
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+var plusIdx = version.IndexOf('+');
+if (plusIdx >= 0) version = version[..plusIdx];
+
+if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
+{
+    Console.WriteLine($"ModernWinManager {version}");
+    return;
+}
 
 var data = StorageService.Load();
 var currentConfig = ScreenConfigService.GetCurrentConfig();
@@ -9,6 +21,21 @@ if (!data.ScreenConfigs.Any(c => c.Fingerprint == currentConfig.Fingerprint))
 {
     data.ScreenConfigs.Add(currentConfig);
     StorageService.Save(data);
+}
+
+if (args.Length > 0 && (args[0] == "--restore-all" || args[0] == "-r"))
+{
+    var positionsForCli = data.SavedPositions
+        .Where(p => p.ScreenFingerprint == currentConfig.Fingerprint)
+        .ToList();
+
+    var (restoredCli, notFoundCli) = RestoreAllPositions(positionsForCli);
+
+    var msg = $"Återställde {restoredCli} program.";
+    if (notFoundCli > 0)
+        msg += $" {notFoundCli} program hittades inte.";
+    Console.WriteLine(msg);
+    return;
 }
 
 bool editMode = false;
@@ -26,7 +53,7 @@ while (true)
 
 void RunSetMode(ref bool editMode, string screenInfo)
 {
-    MenuService.ShowHeader("ModernWinManager [SET]", screenInfo);
+    MenuService.ShowHeader($"ModernWinManager {version} [SET]", screenInfo);
 
     var positions = data.SavedPositions
         .Where(p => p.ScreenFingerprint == currentConfig.Fingerprint)
@@ -93,7 +120,7 @@ void RunSetMode(ref bool editMode, string screenInfo)
     }
     else
     {
-        MenuService.ShowHeader("ModernWinManager [SET]", screenInfo);
+        MenuService.ShowHeader($"ModernWinManager {version} [SET]", screenInfo);
         Console.WriteLine($"Sparade positioner för \"{chosenGroup.First().DisplayName}\":");
 
         var posOptions = savedForProcess.Select(p =>
@@ -120,7 +147,7 @@ void RunSetMode(ref bool editMode, string screenInfo)
 
 void RunEditMode(ref bool editMode, string screenInfo)
 {
-    MenuService.ShowHeader("ModernWinManager [EDIT]", screenInfo);
+    MenuService.ShowHeader($"ModernWinManager {version} [EDIT]", screenInfo);
 
     var options = new List<string>
     {
@@ -320,6 +347,17 @@ void RenameWindow(string screenInfo)
 
 void RestoreAll(List<SavedPosition> positions)
 {
+    var (restored, notFound) = RestoreAllPositions(positions);
+
+    var msg = $"Återställde {restored} program.";
+    if (notFound > 0)
+        msg += $" {notFound} program hittades inte.";
+
+    MenuService.SetPendingMessage(msg, notFound > 0 ? MessageKind.Warning : MessageKind.Success);
+}
+
+(int restored, int notFound) RestoreAllPositions(List<SavedPosition> positions)
+{
     int restored = 0;
     int notFound = 0;
 
@@ -340,9 +378,5 @@ void RestoreAll(List<SavedPosition> positions)
         restored++;
     }
 
-    var msg = $"Återställde {restored} program.";
-    if (notFound > 0)
-        msg += $" {notFound} program hittades inte.";
-
-    MenuService.SetPendingMessage(msg, notFound > 0 ? MessageKind.Warning : MessageKind.Success);
+    return (restored, notFound);
 }

@@ -25,6 +25,13 @@ dotnet run
 
 The app starts in **Set-mode** for quick restores. Press `Ctrl+E` to enter **Edit-mode** for saving and managing positions.
 
+### Command-line flags
+
+| Flag | Action |
+|------|--------|
+| `--restore-all`, `-r` | Restore all saved positions for the current screen config and exit immediately (no menu) |
+| `--version`, `-v` | Print the version and exit |
+
 ### Keyboard shortcuts
 
 | Key | Action |

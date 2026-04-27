@@ -46,5 +46,11 @@ ModernWinManager/
 | `1`/`2` + Enter | Välj alternativ 1 eller 2 |
 | `↑` / `↓` | Bläddra sidor i listor |
 
+## Kommandoradsväxlar
+| Växel | Funktion |
+|-------|----------|
+| `--restore-all`, `-r` | Återställ alla sparade positioner för aktiv skärmkonfig och avsluta direkt (ingen meny) |
+| `--version`, `-v` | Skriv ut versionen och avsluta |
+
 ## Commit-meddelanden
 Lägg inte till "Co-Authored-By: Claude" eller liknande i commit-meddelanden eller PR-kommentarer.
