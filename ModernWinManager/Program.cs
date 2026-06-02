@@ -1,6 +1,10 @@
 using System.Reflection;
+using System.Text;
 using ModernWinManager.Models;
 using ModernWinManager.Services;
+
+// Säkerställ att Unicode-glyfer (↑ ↓ …) renderas oavsett konsolens OEM-kodsida.
+Console.OutputEncoding = Encoding.UTF8;
 
 var version = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
