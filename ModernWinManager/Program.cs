@@ -221,6 +221,7 @@ void DeleteAllForProgram(string screenInfo)
     MenuService.ShowHeader("Ta bort positioner för program", screenInfo);
 
     var programs = data.SavedPositions
+        .Where(p => p.ScreenFingerprint == currentConfig.Fingerprint)
         .GroupBy(p => p.ProcessName)
         .Select(g => g.Key)
         .OrderBy(n => n)
@@ -228,13 +229,13 @@ void DeleteAllForProgram(string screenInfo)
 
     if (programs.Count == 0)
     {
-        MenuService.SetPendingMessage("Inga sparade positioner.", MessageKind.Warning);
+        MenuService.SetPendingMessage("Inga sparade positioner för denna skärmkonfig.", MessageKind.Warning);
         return;
     }
 
     var options = programs.Select(p =>
     {
-        var count = data.SavedPositions.Count(x => x.ProcessName == p);
+        var count = data.SavedPositions.Count(x => x.ProcessName == p && x.ScreenFingerprint == currentConfig.Fingerprint);
         return $"{p}  ({count} position{(count > 1 ? "er" : "")})";
     }).ToList();
 
@@ -242,9 +243,8 @@ void DeleteAllForProgram(string screenInfo)
     if (idx < 0) return;
 
     var chosen = programs[idx];
-    int count2 = data.SavedPositions.Count(x => x.ProcessName == chosen);
 
-    data.SavedPositions.RemoveAll(p => p.ProcessName == chosen);
+    data.SavedPositions.RemoveAll(p => p.ProcessName == chosen && p.ScreenFingerprint == currentConfig.Fingerprint);
     StorageService.Save(data);
 
     MenuService.SetPendingMessage($"Tog bort alla positioner för \"{chosen}\".", MessageKind.Success);
@@ -309,13 +309,14 @@ void RenameWindow(string screenInfo)
     MenuService.ShowHeader("Byt namn på sparat fönster", screenInfo);
 
     var programs = data.SavedPositions
+        .Where(p => p.ScreenFingerprint == currentConfig.Fingerprint)
         .GroupBy(p => p.ProcessName)
         .OrderBy(g => g.First().DisplayName)
         .ToList();
 
     if (programs.Count == 0)
     {
-        MenuService.SetPendingMessage("Inga sparade positioner.", MessageKind.Warning);
+        MenuService.SetPendingMessage("Inga sparade positioner för denna skärmkonfig.", MessageKind.Warning);
         return;
     }
 
