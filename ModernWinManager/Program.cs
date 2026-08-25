@@ -159,7 +159,7 @@ void RunEditMode(ref bool editMode, string screenInfo)
         "Byt namn på ett sparat fönster",
         "Ta bort positioner för ett program",
         "Ta bort en enskild position",
-        "Skärmkonfigurationer  (lista / byt namn / ta bort)",
+        "Skärmkonfigurationer  (lista / byt namn / kopiera / ta bort)",
         "Tillbaka till Set-mode  (Esc)"
     };
 
@@ -313,11 +313,21 @@ void ScreenConfigs(string screenInfo)
         Console.WriteLine($"Teknisk beskrivning: {cfg.Description}");
         Console.WriteLine($"Sparade positioner: {positions}");
 
-        int action = MenuService.PickOption("Välj (Esc = tillbaka):",
-            ["Byt namn", "Ta bort skärmkonfig"], out _);
+        var isActive = cfg.Fingerprint == currentConfig.Fingerprint;
+
+        // Kopiering och radering är meningslösa på den aktiva konfigen: kopiering vore
+        // en no-op och en raderad aktiv konfig registreras om direkt vid nästa varv.
+        var actions = new List<string> { "Byt namn" };
+        if (!isActive)
+        {
+            actions.Add("Kopiera positioner till aktiv konfig");
+            actions.Add("Ta bort skärmkonfig");
+        }
+
+        int action = MenuService.PickOption("Välj (Esc = tillbaka):", actions, out _);
         if (action < 0) continue;
 
-        if (action == 0)
+        if (actions[action] == "Byt namn")
         {
             Console.Write($"Nytt namn för \"{cfg.DisplayName}\" (tomt = återställ till standard): ");
             var name = Console.ReadLine()?.Trim();
@@ -329,9 +339,48 @@ void ScreenConfigs(string screenInfo)
             continue;
         }
 
-        if (cfg.Fingerprint == currentConfig.Fingerprint)
+        if (actions[action] == "Kopiera positioner till aktiv konfig")
         {
-            MenuService.SetPendingMessage("Den aktiva skärmkonfigen kan inte tas bort — den registreras om direkt.", MessageKind.Warning);
+            var existing = data.SavedPositions
+                .Where(p => p.ScreenFingerprint == currentConfig.Fingerprint)
+                .Select(p => p.ProcessName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var toCopy = data.SavedPositions
+                .Where(p => p.ScreenFingerprint == cfg.Fingerprint && !existing.Contains(p.ProcessName))
+                .ToList();
+
+            var skipped = positions - toCopy.Count;
+
+            if (toCopy.Count == 0)
+            {
+                MenuService.SetPendingMessage(
+                    positions == 0
+                        ? $"\"{cfg.DisplayName}\" har inga sparade positioner."
+                        : "Alla program i den konfigen finns redan i den aktiva konfigen.",
+                    MessageKind.Warning);
+                continue;
+            }
+
+            foreach (var pos in toCopy)
+                data.SavedPositions.Add(new SavedPosition
+                {
+                    ProcessName = pos.ProcessName,
+                    CustomName = pos.CustomName,
+                    WindowTitle = pos.WindowTitle,
+                    ScreenFingerprint = currentConfig.Fingerprint,
+                    X = pos.X,
+                    Y = pos.Y,
+                    Width = pos.Width,
+                    Height = pos.Height
+                });
+
+            StorageService.Save(data);
+
+            var copyMsg = $"Kopierade {toCopy.Count} position{(toCopy.Count == 1 ? "" : "er")} från \"{cfg.DisplayName}\".";
+            if (skipped > 0)
+                copyMsg += $" {skipped} hoppades över (programmet fanns redan).";
+            MenuService.SetPendingMessage(copyMsg, MessageKind.Success);
             continue;
         }
 
