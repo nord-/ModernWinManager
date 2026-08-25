@@ -159,8 +159,7 @@ void RunEditMode(ref bool editMode, string screenInfo)
         "Byt namn på ett sparat fönster",
         "Ta bort positioner för ett program",
         "Ta bort en enskild position",
-        "Byt namn på skärmkonfig",
-        "Lista skärmkonfigurationer",
+        "Skärmkonfigurationer  (lista / byt namn)",
         "Tillbaka till Set-mode  (Esc)"
     };
 
@@ -181,9 +180,8 @@ void RunEditMode(ref bool editMode, string screenInfo)
         case 1: RenameWindow(screenInfo); break;
         case 2: DeleteAllForProgram(screenInfo); break;
         case 3: DeleteSinglePosition(screenInfo); break;
-        case 4: RenameScreenConfig(screenInfo); break;
-        case 5: ListScreenConfigs(screenInfo); break;
-        case 6: editMode = false; break;
+        case 4: ScreenConfigs(screenInfo); break;
+        case 5: editMode = false; break;
     }
 }
 
@@ -285,50 +283,41 @@ void DeleteSinglePosition(string screenInfo)
     MenuService.SetPendingMessage("Positionen togs bort.", MessageKind.Success);
 }
 
-void RenameScreenConfig(string screenInfo)
+void ScreenConfigs(string screenInfo)
 {
-    MenuService.ShowHeader("Byt namn på skärmkonfig", screenInfo);
-
-    var cfg = data.ScreenConfigs.FirstOrDefault(c => c.Fingerprint == currentConfig.Fingerprint);
-    if (cfg == null)
+    while (true)
     {
-        MenuService.SetPendingMessage("Skärmkonfig ej registrerad.", MessageKind.Error);
-        return;
+        MenuService.ShowHeader("Skärmkonfigurationer", screenInfo);
+
+        var configs = data.ScreenConfigs.OrderBy(c => c.DisplayName).ToList();
+
+        var options = configs.Select(c =>
+        {
+            var count = data.SavedPositions.Count(p => p.ScreenFingerprint == c.Fingerprint);
+            var marker = c.Fingerprint == currentConfig.Fingerprint ? "* " : "  ";
+            // Monitorerna på samma rad — Description är oftast identisk mellan konfigar,
+            // det är enhetsnamn och position som skiljer dem åt.
+            var monitors = string.Join(" · ", c.Monitors.Select(m =>
+                $"{m.DeviceName.Split('\\').Last()} {m.Width}x{m.Height}@{m.X},{m.Y}"));
+            return $"{marker}{c.DisplayName}  [{c.Fingerprint[..8]}]  {count} pos  {monitors}";
+        }).ToList();
+
+        Console.WriteLine("* = aktiv konfig");
+        int idx = MenuService.PickOption("Välj konfig att byta namn på (Esc = tillbaka):", options, out _);
+        if (idx < 0) return;
+
+        var cfg = configs[idx];
+
+        Console.WriteLine();
+        Console.WriteLine($"Teknisk beskrivning: {cfg.Description}");
+        Console.Write($"Nytt namn för \"{cfg.DisplayName}\" (tomt = återställ till standard): ");
+        var name = Console.ReadLine()?.Trim();
+
+        cfg.CustomName = string.IsNullOrEmpty(name) ? null : name;
+        StorageService.Save(data);
+
+        MenuService.SetPendingMessage($"Namnet uppdaterades till: {cfg.DisplayName}", MessageKind.Success);
     }
-
-    Console.WriteLine($"Nuvarande namn: {cfg.DisplayName}");
-    Console.WriteLine($"Teknisk beskrivning: {cfg.Description}");
-    Console.WriteLine();
-    Console.Write("Nytt namn (tomt = återställ till standard): ");
-    var name = Console.ReadLine()?.Trim();
-
-    cfg.CustomName = string.IsNullOrEmpty(name) ? null : name;
-    StorageService.Save(data);
-
-    MenuService.SetPendingMessage($"Namnet uppdaterades till: {cfg.DisplayName}", MessageKind.Success);
-}
-
-void ListScreenConfigs(string screenInfo)
-{
-    MenuService.ShowHeader("Skärmkonfigurationer", screenInfo);
-
-    foreach (var cfg in data.ScreenConfigs.OrderBy(c => c.DisplayName))
-    {
-        var count = data.SavedPositions.Count(p => p.ScreenFingerprint == cfg.Fingerprint);
-        var active = cfg.Fingerprint == currentConfig.Fingerprint;
-
-        if (active) Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"{(active ? "* " : "  ")}{cfg.DisplayName}  [{cfg.Fingerprint[..8]}]  ({count} position{(count == 1 ? "" : "er")})");
-        if (active) Console.ResetColor();
-
-        Console.WriteLine($"    {cfg.Description}");
-        foreach (var m in cfg.Monitors)
-            Console.WriteLine($"      {m.DeviceName}  {m.Width}x{m.Height} @ ({m.X},{m.Y})");
-    }
-
-    Console.WriteLine();
-    Console.Write("Tryck valfri tangent för att gå tillbaka... ");
-    Console.ReadKey(intercept: true);
 }
 
 void RenameWindow(string screenInfo)
