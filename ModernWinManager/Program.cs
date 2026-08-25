@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text;
 using ModernWinManager.Models;
 using ModernWinManager.Services;
@@ -160,6 +160,7 @@ void RunEditMode(ref bool editMode, string screenInfo)
         "Ta bort positioner för ett program",
         "Ta bort en enskild position",
         "Byt namn på skärmkonfig",
+        "Lista skärmkonfigurationer",
         "Tillbaka till Set-mode  (Esc)"
     };
 
@@ -181,7 +182,8 @@ void RunEditMode(ref bool editMode, string screenInfo)
         case 2: DeleteAllForProgram(screenInfo); break;
         case 3: DeleteSinglePosition(screenInfo); break;
         case 4: RenameScreenConfig(screenInfo); break;
-        case 5: editMode = false; break;
+        case 5: ListScreenConfigs(screenInfo); break;
+        case 6: editMode = false; break;
     }
 }
 
@@ -258,22 +260,20 @@ void DeleteSinglePosition(string screenInfo)
 {
     MenuService.ShowHeader("Ta bort enskild position", screenInfo);
 
-    if (data.SavedPositions.Count == 0)
+    var sorted = data.SavedPositions
+        .Where(p => p.ScreenFingerprint == currentConfig.Fingerprint)
+        .OrderBy(p => p.ProcessName)
+        .ToList();
+
+    if (sorted.Count == 0)
     {
-        MenuService.SetPendingMessage("Inga sparade positioner.", MessageKind.Warning);
+        MenuService.SetPendingMessage("Inga sparade positioner för denna skärmkonfig.", MessageKind.Warning);
         return;
     }
 
-    var options = data.SavedPositions
-        .OrderBy(p => p.ProcessName)
-        .Select(p =>
-        {
-            var cfgName = data.ScreenConfigs.FirstOrDefault(c => c.Fingerprint == p.ScreenFingerprint)?.DisplayName
-                          ?? p.ScreenFingerprint[..8];
-            return $"{p.ProcessName}  \"{p.WindowTitle}\"  ({p.X},{p.Y} {p.Width}x{p.Height})  [{cfgName}]  {p.SavedAt:yyyy-MM-dd HH:mm}";
-        }).ToList();
-
-    var sorted = data.SavedPositions.OrderBy(p => p.ProcessName).ToList();
+    var options = sorted
+        .Select(p => $"{p.ProcessName}  \"{p.WindowTitle}\"  ({p.X},{p.Y} {p.Width}x{p.Height})  {p.SavedAt:yyyy-MM-dd HH:mm}")
+        .ToList();
 
     int idx = MenuService.PickOption("Välj position att ta bort (Esc = tillbaka):", options, out _);
     if (idx < 0) return;
@@ -306,6 +306,29 @@ void RenameScreenConfig(string screenInfo)
     StorageService.Save(data);
 
     MenuService.SetPendingMessage($"Namnet uppdaterades till: {cfg.DisplayName}", MessageKind.Success);
+}
+
+void ListScreenConfigs(string screenInfo)
+{
+    MenuService.ShowHeader("Skärmkonfigurationer", screenInfo);
+
+    foreach (var cfg in data.ScreenConfigs.OrderBy(c => c.DisplayName))
+    {
+        var count = data.SavedPositions.Count(p => p.ScreenFingerprint == cfg.Fingerprint);
+        var active = cfg.Fingerprint == currentConfig.Fingerprint;
+
+        if (active) Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"{(active ? "* " : "  ")}{cfg.DisplayName}  [{cfg.Fingerprint[..8]}]  ({count} position{(count == 1 ? "" : "er")})");
+        if (active) Console.ResetColor();
+
+        Console.WriteLine($"    {cfg.Description}");
+        foreach (var m in cfg.Monitors)
+            Console.WriteLine($"      {m.DeviceName}  {m.Width}x{m.Height} @ ({m.X},{m.Y})");
+    }
+
+    Console.WriteLine();
+    Console.Write("Tryck valfri tangent för att gå tillbaka... ");
+    Console.ReadKey(intercept: true);
 }
 
 void RenameWindow(string screenInfo)
