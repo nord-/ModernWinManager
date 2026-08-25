@@ -159,7 +159,7 @@ void RunEditMode(ref bool editMode, string screenInfo)
         "Byt namn på ett sparat fönster",
         "Ta bort positioner för ett program",
         "Ta bort en enskild position",
-        "Skärmkonfigurationer  (lista / byt namn)",
+        "Skärmkonfigurationer  (lista / byt namn / ta bort)",
         "Tillbaka till Set-mode  (Esc)"
     };
 
@@ -303,20 +303,54 @@ void ScreenConfigs(string screenInfo)
         }).ToList();
 
         Console.WriteLine("* = aktiv konfig");
-        int idx = MenuService.PickOption("Välj konfig att byta namn på (Esc = tillbaka):", options, out _);
+        int idx = MenuService.PickOption("Välj konfig (Esc = tillbaka):", options, out _);
         if (idx < 0) return;
 
         var cfg = configs[idx];
+        var positions = data.SavedPositions.Count(p => p.ScreenFingerprint == cfg.Fingerprint);
+
+        MenuService.ShowHeader($"Skärmkonfig: {cfg.DisplayName}", screenInfo);
+        Console.WriteLine($"Teknisk beskrivning: {cfg.Description}");
+        Console.WriteLine($"Sparade positioner: {positions}");
+
+        int action = MenuService.PickOption("Välj (Esc = tillbaka):",
+            ["Byt namn", "Ta bort skärmkonfig"], out _);
+        if (action < 0) continue;
+
+        if (action == 0)
+        {
+            Console.Write($"Nytt namn för \"{cfg.DisplayName}\" (tomt = återställ till standard): ");
+            var name = Console.ReadLine()?.Trim();
+
+            cfg.CustomName = string.IsNullOrEmpty(name) ? null : name;
+            StorageService.Save(data);
+
+            MenuService.SetPendingMessage($"Namnet uppdaterades till: {cfg.DisplayName}", MessageKind.Success);
+            continue;
+        }
+
+        if (cfg.Fingerprint == currentConfig.Fingerprint)
+        {
+            MenuService.SetPendingMessage("Den aktiva skärmkonfigen kan inte tas bort — den registreras om direkt.", MessageKind.Warning);
+            continue;
+        }
 
         Console.WriteLine();
-        Console.WriteLine($"Teknisk beskrivning: {cfg.Description}");
-        Console.Write($"Nytt namn för \"{cfg.DisplayName}\" (tomt = återställ till standard): ");
-        var name = Console.ReadLine()?.Trim();
+        Console.Write($"Ta bort \"{cfg.DisplayName}\" och {positions} sparade position{(positions == 1 ? "" : "er")}? (j/N): ");
+        var answer = Console.ReadKey(intercept: true).Key;
+        Console.WriteLine();
 
-        cfg.CustomName = string.IsNullOrEmpty(name) ? null : name;
+        if (answer is not (ConsoleKey.J or ConsoleKey.Y))
+        {
+            MenuService.SetPendingMessage("Ingenting togs bort.", MessageKind.Info);
+            continue;
+        }
+
+        data.SavedPositions.RemoveAll(p => p.ScreenFingerprint == cfg.Fingerprint);
+        data.ScreenConfigs.Remove(cfg);
         StorageService.Save(data);
 
-        MenuService.SetPendingMessage($"Namnet uppdaterades till: {cfg.DisplayName}", MessageKind.Success);
+        MenuService.SetPendingMessage($"Tog bort \"{cfg.DisplayName}\" och {positions} position{(positions == 1 ? "" : "er")}.", MessageKind.Success);
     }
 }
 
