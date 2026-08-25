@@ -31,7 +31,8 @@ ModernWinManager/
 
 ## Funktioner
 - **Set-mode** (startar här): återställ sparade fönsterpositioner filtrerat på aktiv skärmkonfig
-- **Edit-mode** (Ctrl+E): spara, byta namn, ta bort positioner; byta namn på skärmkonfig
+- **Edit-mode** (Ctrl+E): spara, byta namn, ta bort positioner; lista alla skärmkonfigurationer (aktiv markerad med `*`) och per konfig byta namn, kopiera dess positioner till den aktiva konfigen (program som redan finns hoppas över) eller ta bort konfigen med dess positioner
+- Listor i Edit-mode filtreras på aktiv skärmkonfig
 - Skärmkonfig identifieras med SHA256-fingerprint av monitorernas layout
 - Stöd för program med flera fönster (t.ex. qemu/Android-emulator) — alla fönster flyttas
 - Listor: max 20 per sida, ↑↓ bläddrar, rader trunkeras med ellipsis
